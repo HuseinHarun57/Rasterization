@@ -27,7 +27,8 @@ void main()
    gl_Position = toClippingSpace * projection * worldToCamera * modelToWorld * vec4(aPos, 1.0);
    pos = aPos;
    uv = aUV;
-   normal = aNormal;
+   // Rotate the normal into world space (mat3 drops the translation part)
+   normal = mat3(modelToWorld) * aNormal;
 }
 )";
 
@@ -41,7 +42,13 @@ out vec4 FragColor;
 
 void main()
 {
-   FragColor = vec4((pos.x+1)/2, (pos.y+1)/2, 0.0f, 1.0f);
+   vec3 N = normalize(normal);                      
+   vec3 L = normalize(vec3(0.5, 1.0, 0.8));         
+   float diffuse = max(dot(N, L), 0.0);             
+   float ambient = 0.15;                            
+
+   vec3 baseColor = vec3(0.3, 0.8, 0.4);            
+   FragColor = vec4(baseColor * (ambient + diffuse), 1.0);
 }
 )";
 
@@ -82,17 +89,8 @@ int main()
 
     unsigned int shaderProgramTriangle = compileShaderProgram(vertexShaderSource, fragmentShaderTealSource);
     
-    //float triangleVertices[] = {
-    //    /*position*/-.9f, -.9f, -20.0f, /* uvs */ 0, 0, /*normals*/ 0, 0, 1,// Vertex one
-    //    /*position*/.9f,  -.9f, -20.0f, /* uvs */ 1, 0, /*normals*/ 0, 0, 1,// Vertex two
-    //    /*position*/.9f,  .9f,  -20.0f, /* uvs */ 1, 1, /*normals*/ 0, 0, 1,// Vertex three
-        
-    //    /*position*/-.9f, -.9f, -20.0f, /* uvs */ 0, 0, /*normals*/ 0, 0, 1,// Vertex one
-    //    /*position*/-.9f,  .9f, -20.0f, /* u vs */ 0, 1, /*normals*/ 0, 0, 1,// Vertex two
-    //    /*position*/.9f,  .9f,  -20.0f, /* u vs */ 1, 1, /*normals*/ 0, 0, 1,// Vertex three
-    //};
 
-    std::vector<float> meshVertices = loadOBJ("Untitled.obj");
+    std::vector<float> meshVertices = loadOBJ("Monster.obj");
     int meshVertexCount = (int)(meshVertices.size() / 8);
     
 
@@ -123,14 +121,14 @@ int main()
 
     float FOV = 45;
     float radians = FOV/360 * 2 * 3.14159265f;
-    float aspectRatio = 800/600.0f;
+    float aspectRatio = 1600/1280.0f;
     float top = nearPlane * tan(radians/2);
     float right = top * aspectRatio;
 
     float modelToWorld[] = {
         1, 0, 0, 10, //
-        0, 1, 0, 0, //
-        0, 0, 1, -5, //
+        0, 1, 0, -10, //
+        0, 0, 1, -30, //
         0, 0, 0, 1, //
     };
 
@@ -155,10 +153,14 @@ int main()
         0, 0, 0, 1, //
     };
 
+    // Depth test: keep only the closest fragment at each pixel
+    glEnable(GL_DEPTH_TEST);
+
     while (!glfwWindowShouldClose(window))
     {
         glClearColor(0.f, 0.f, 0.f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // Clear the depth buffer too, or last frame's depth values block this frame
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
        
 
         glUseProgram(shaderProgramTriangle);
